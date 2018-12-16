@@ -1,0 +1,63 @@
+
+# coding: utf-8
+
+# ### authenticate
+
+# In[18]:
+
+
+import requests
+
+token_dict = get_ipython().getoutput(u'curl -X POST -H "Accept: application/x-www-form-urlencoded" -d "grant_type=password&username=rajeshhamal&password=xxxxxx" "https://api.mmitnetwork.com/Token"')
+token_dict=eval(token_dict[-1])
+token=token_dict['access_token']
+headers = {'Authorization':'bearer %s' % token, 'Accept':'application/json'}
+
+
+# ### product info
+
+# In[19]:
+
+
+get_ipython().run_cell_magic(u'time', u'', u"import pandas as pd\nproduct_url='https://api.mmitnetwork.com/Formulary/v1/Products?'\nproduct = requests.get(product_url,  headers=headers)\nproduct_data=product.json()\ndf_product=pd.DataFrame(product_data['Products'])\ndf_tmp_prod=df_product.Drug.apply(pd.Series)\ndf_product_final=pd.concat([df_tmp_prod, df_product],1)\ndf_product_final.drop('Drug',1,inplace=True)\n\n#df_product_final.to_csv('product_final_list.csv',index=False)")
+
+
+# ### coverage info
+
+# In[25]:
+
+
+def coverage_info(productID, channelId, State):
+    coverage_url='https://api.mmitnetwork.com/Formulary/v1/Coverage?ProductId=%s&ChannelId=%s&StateId=%s'%    (productID, channelId, State)
+    coverage = requests.get(coverage_url,  headers=headers)   
+    try:
+        coverage_data=coverage.json()
+        df_coverage=pd.DataFrame(coverage_data['ControllerCoverages'])
+        df_tmp=df_coverage[df_coverage.ControllerId==4818].reset_index(drop=1)
+        df_tmp_cov=df_tmp.DrugListTier.apply(pd.Series)
+        df_coverage_final=pd.concat([df_tmp_cov, df_tmp],1)
+        df_coverage_final.drop(['DrugListTier','UnifiedTier'],1,inplace=True)
+        df_coverage_final['Overall_Pct']=coverage_data['Statement']
+        return df_coverage_final
+    except:
+        return None
+
+
+# In[43]:
+
+
+get_ipython().run_cell_magic(u'time', u'', u"df_final=coverage_info('226948', '1', 'PA')\nfail_list=[]\nfor productID in df_product_final.ProductId: \n        df_final=df_final.append(coverage_info(productID, '1', 'PA'),ignore_index=True)")
+
+
+# ### payer info
+
+# In[183]:
+
+
+payer_url='https://api.mmitnetwork.com/Formulary/v1/Parents'
+payer = requests.get(payer_url,  headers=headers)
+payer_data=payer.json()
+
+payer_df=pd.DataFrame(payer_data['Parents'])
+payer_df[payer_df.Name.str.contains('Highmark, Inc.')]
+
